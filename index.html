@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Block Party Permit Tracker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#1a1a1a}
+
+  /* ── Header ── */
+  header{background:#1e3a5f;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  header h1{font-size:18px;font-weight:600;flex:1}
+  header .btn{padding:7px 16px;border-radius:6px;border:none;font-size:13px;cursor:pointer;font-weight:500}
+  .btn-outline{background:transparent;border:1px solid rgba(255,255,255,0.5)!important;color:#fff}
+  .btn-outline:hover{background:rgba(255,255,255,0.1)}
+  .btn-primary{background:#3b82f6;color:#fff}
+  .btn-primary:hover{background:#2563eb}
+
+  /* ── Stats bar ── */
+  #stats-bar{background:#fff;border-bottom:1px solid #e5e7eb;padding:8px 20px;display:flex;gap:24px;flex-wrap:wrap;font-size:13px}
+  .stat{color:#6b7280}.stat strong{color:#111827}
+
+  /* ── Layout ── */
+  #main{display:flex;height:calc(100vh - 110px);min-height:400px}
+  #map{flex:1;min-height:300px}
+  #sidebar{width:300px;background:#fff;border-left:1px solid #e5e7eb;overflow-y:auto;flex-shrink:0}
+
+  /* ── Sidebar ── */
+  #sidebar-header{padding:12px 16px;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:600;color:#374151;display:flex;justify-content:space-between;align-items:center}
+  .permit-card{padding:12px 16px;border-bottom:1px solid #f3f4f6;cursor:pointer;transition:background 0.1s}
+  .permit-card:hover{background:#f9fafb}
+  .permit-card.selected{background:#eff6ff;border-left:3px solid #3b82f6}
+  .permit-card h4{font-size:13px;font-weight:600;margin-bottom:4px;color:#111827}
+  .permit-card .meta{font-size:11px;color:#9ca3af}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-top:4px}
+
+  /* ── Legend ── */
+  #legend{background:#fff;border-top:1px solid #e5e7eb;padding:8px 20px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px;color:#6b7280}
+  .leg{display:flex;align-items:center;gap:6px}
+  .leg-bar{width:26px;height:5px;border-radius:3px}
+
+  /* ── Info popup ── */
+  #info-box{position:absolute;bottom:50px;left:20px;z-index:1000;background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14px 16px;max-width:260px;display:none}
+  #info-box.open{display:block}
+  #info-box h4{font-size:14px;font-weight:600;margin-bottom:8px}
+  .info-row{display:flex;gap:8px;font-size:12px;margin:3px 0;color:#6b7280}
+  .info-row span:first-child{font-weight:600;color:#374151;min-width:72px}
+  #info-close{position:absolute;top:8px;right:10px;background:none;border:none;font-size:18px;cursor:pointer;color:#9ca3af}
+
+  /* ── Modal ── */
+  .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;align-items:center;justify-content:center}
+  .modal-backdrop.open{display:flex}
+  .modal{background:#fff;border-radius:12px;padding:24px;width:min(560px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+  .modal h2{font-size:17px;font-weight:600;margin-bottom:18px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .form-group{display:flex;flex-direction:column;gap:5px}
+  .form-group.full{grid-column:1/-1}
+  label{font-size:12px;font-weight:600;color:#374151}
+  input,select,textarea{font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#111827;width:100%;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
+  textarea{resize:vertical;min-height:70px}
+  .form-hint{font-size:11px;color:#9ca3af;margin-top:2px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f3f4f6}
+  .btn{padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;border:1px solid #e5e7eb;background:#fff;color:#374151}
+  .btn:hover{background:#f9fafb}
+  .btn.primary{background:#1e3a5f;color:#fff;border-color:#1e3a5f}
+  .btn.primary:hover{background:#16304f}
+  .btn.danger{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
+  .btn.danger:hover{background:#fecaca}
+
+  /* ── Table view ── */
+  #permit-table-wrap{overflow-x:auto;max-height:60vh}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;padding:8px 10px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e5e7eb;background:#f9fafb;position:sticky;top:0}
+  td{padding:9px 10px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+  tr:hover td{background:#f9fafb}
+
+  /* ── Coord picker ── */
+  #coord-status{font-size:11px;color:#3b82f6;margin-top:4px;min-height:16px}
+  #pick-btn{font-size:11px;padding:4px 10px;margin-top:4px}
+
+  /* ── Responsive ── */
+  @media(max-width:640px){
+    #sidebar{display:none}
+    .form-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎉 Block Party Permit Tracker</h1>
+  <button class="btn btn-outline" onclick="openViewModal()">📋 View All</button>
+  <button class="btn btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
+  <button class="btn btn-primary" onclick="openAddModal()">+ New Application</button>
+</header>
+
+<div id="stats-bar"></div>
+
+<div id="main">
+  <div style="position:relative;flex:1">
+    <div id="map"></div>
+    <div id="info-box">
+      <button id="info-close" onclick="document.getElementById('info-box').classList.remove('open')">×</button>
+      <h4 id="ib-street"></h4>
+      <div id="ib-body"></div>
+    </div>
+  </div>
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <span>Applications (<span id="sb-count">0</span>)</span>
+      <input type="text" id="sb-search" placeholder="Search..." style="width:120px;font-size:12px;padding:4px 8px">
+    </div>
+    <div id="sb-list"></div>
+  </div>
+</div>
+
+<div id="legend">
+  <strong style="color:#374151">Color key:</strong>
+  <div class="leg"><div class="leg-bar" style="background:#9ca3af"></div>Pending approval</div>
+  <div class="leg"><div class="leg-bar" style="background:#ef4444"></div>≤1 week</div>
+  <div class="leg"><div class="leg-bar" style="background:#f97316"></div>≤2 weeks</div>
+  <div class="leg"><div class="leg-bar" style="background:#eab308"></div>≤3 weeks</div>
+  <div class="leg"><div class="leg-bar" style="background:#3b82f6"></div>≤4 weeks</div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-backdrop" id="add-modal">
+  <div class="modal">
+    <h2>New Block Party Application</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Date Application Received *</label>
+        <input type="date" id="f-received">
+      </div>
+      <div class="form-group">
+        <label>Date Approved (leave blank if pending)</label>
+        <input type="date" id="f-approved">
+      </div>
+      <div class="form-group full">
+        <label>Street / Block to be Closed *</label>
+        <input type="text" id="f-street" placeholder="e.g. 400 block of Oak St">
+      </div>
+      <div class="form-group full">
+        <label>Bounding Cross Streets</label>
+        <input type="text" id="f-cross" placeholder="e.g. Elm Ave & Maple Ave">
+      </div>
+      <div class="form-group">
+        <label>Event Date *</label>
+        <input type="date" id="f-eventdate">
+      </div>
+      <div class="form-group">
+        <label>Closure Hours</label>
+        <input type="text" id="f-hours" placeholder="e.g. 12:00 PM – 6:00 PM">
+      </div>
+      <div class="form-group full">
+        <label>Planned Activities</label>
+        <textarea id="f-activities" placeholder="Live music, food vendors, bounce house, games..."></textarea>
+      </div>
+      <div class="form-group full">
+        <label>Map Location</label>
+        <div style="display:flex;gap:8px">
+          <input type="number" id="f-lat" placeholder="Latitude" step="any">
+          <input type="number" id="f-lng" placeholder="Longitude" step="any">
+        </div>
+        <p class="form-hint">Close this dialog and click the map to auto-place, or enter coordinates manually.</p>
+        <div id="coord-status"></div>
+      </div>
+      <div class="form-group full">
+        <label>Applicant Name</label>
+        <input type="text" id="f-applicant" placeholder="Full name">
+      </div>
+      <div class="form-group full">
+        <label>Contact Phone / Email</label>
+        <input type="text" id="f-contact" placeholder="Phone or email">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModals()">Cancel</button>
+      <button class="btn primary" onclick="submitForm()">Save Application</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW ALL MODAL -->
+<div class="modal-backdrop" id="view-modal">
+  <div class="modal" style="width:min(820px,96vw)">
+    <h2>All Permit Applications</h2>
+    <div id="permit-table-wrap">
+      <table id="permit-table">
+        <thead>
+          <tr>
+            <th>Street</th>
+            <th>Event Date</th>
+            <th>Hours</th>
+            <th>Status</th>
+            <th>Received</th>
+            <th>Approved</th>
+            <th>Applicant</th>
+            <th>Activities</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ptbody"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModals()">Close</button>
+      <button class="btn primary" onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────
+// HOW TO ADD PERMITS WITHOUT THE UI:
+// Add objects to the STATIC_PERMITS array below, following the same format.
+// Each permit needs a unique id (just increment the number).
+// lat/lng = the center of the block to close.
+const STATIC_PERMITS = [
+  {
+    id: 1,
+    received: '2026-03-01',
+    approved: '2026-03-10',
+    street: '400 block of Oak St',
+    cross: 'Elm Ave & Maple Ave',
+    eventdate: '2026-03-30',
+    hours: '12:00 PM – 6:00 PM',
+    activities: 'Live music, food vendors, bounce house',
+    applicant: 'Jane Smith',
+    contact: 'jane@example.com',
+    lat: 37.871,
+    lng: -122.273
+  },
+  {
+    id: 2,
+    received: '2026-03-05',
+    approved: '2026-03-12',
+    street: '200 block of Pine Ave',
+    cross: '1st St & 2nd St',
+    eventdate: '2026-04-05',
+    hours: '10:00 AM – 4:00 PM',
+    activities: 'Community cookout, kids games, raffle',
+    applicant: 'Robert Johnson',
+    contact: '555-0142',
+    lat: 37.868,
+    lng: -122.268
+  },
+  {
+    id: 3,
+    received: '2026-03-10',
+    approved: '',
+    street: '600 block of Cedar Blvd',
+    cross: 'Park St & Garden St',
+    eventdate: '2026-04-18',
+    hours: '2:00 PM – 8:00 PM',
+    activities: 'Block dance, potluck dinner',
+    applicant: 'Maria Garcia',
+    contact: 'mgarcia@mail.com',
+    lat: 37.874,
+    lng: -122.279
+  },
+  {
+    id: 4,
+    received: '2026-03-15',
+    approved: '2026-03-20',
+    street: '100 block of Birch Ln',
+    cross: 'Main St & 1st Ave',
+    eventdate: '2026-04-10',
+    hours: '11:00 AM – 5:00 PM',
+    activities: 'Craft fair, petting zoo, food trucks',
+    applicant: 'Tom Lee',
+    contact: '555-0199',
+    lat: 37.865,
+    lng: -122.261
+  }
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+const LS_KEY = 'blockparty_v2';
+let permits = [];
+let mapLayers = [];
+let selectedId = null;
+let pickingCoord = false;
+
+function loadPermits() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+    // Merge: STATIC_PERMITS are authoritative by id; local additions are appended
+    const staticIds = new Set(STATIC_PERMITS.map(p => p.id));
+    const localExtras = saved.filter(p => !staticIds.has(p.id));
+    return [...STATIC_PERMITS, ...localExtras];
+  } catch { return [...STATIC_PERMITS]; }
+}
+
+function saveLocalExtras() {
+  const staticIds = new Set(STATIC_PERMITS.map(p => p.id));
+  const extras = permits.filter(p => !staticIds.has(p.id));
+  try { localStorage.setItem(LS_KEY, JSON.stringify(extras)); } catch {}
+}
+
+// ── COLOR LOGIC ───────────────────────────────────────────────────────────
+function getColor(p) {
+  if (!p.approved) return '#9ca3af';
+  const days = (new Date(p.eventdate + 'T00:00:00') - new Date()) / 86400000;
+  if (days <= 7)  return '#ef4444';
+  if (days <= 14) return '#f97316';
+  if (days <= 21) return '#eab308';
+  return '#3b82f6';
+}
+
+function statusLabel(p) {
+  if (!p.approved) return { text: 'Pending', bg: '#f3f4f6', color: '#6b7280' };
+  const days = Math.round((new Date(p.eventdate + 'T00:00:00') - new Date()) / 86400000);
+  if (days <= 0)  return { text: 'Past', bg: '#f3f4f6', color: '#6b7280' };
+  if (days <= 7)  return { text: `${days}d — urgent`, bg: '#fee2e2', color: '#b91c1c' };
+  if (days <= 14) return { text: `${days}d`, bg: '#ffedd5', color: '#c2410c' };
+  if (days <= 21) return { text: `${days}d`, bg: '#fef9c3', color: '#854d0e' };
+  return { text: `${days}d`, bg: '#dbeafe', color: '#1d4ed8' };
+}
+
+function badge(p) {
+  const s = statusLabel(p);
+  return `<span class="badge" style="background:${s.bg};color:${s.color}">${s.text}</span>`;
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────
+let map;
+function initMap() {
+  map = L.map('map').setView([37.871, -122.271], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+  }).addTo(map);
+  map.on('click', function(e) {
+    if (!pickingCoord) return;
+    document.getElementById('f-lat').value = e.latlng.lat.toFixed(6);
+    document.getElementById('f-lng').value = e.latlng.lng.toFixed(6);
+    document.getElementById('coord-status').textContent = `✓ Placed at ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+    pickingCoord = false;
+    openAddModal();
+  });
+}
+
+function renderMap() {
+  mapLayers.forEach(l => map.removeLayer(l));
+  mapLayers = [];
+  permits.forEach(p => {
+    if (!p.lat || !p.lng) return;
+    const c = getColor(p);
+    const offset = 0.0025;
+    const line = L.polyline([[p.lat, p.lng - offset],[p.lat, p.lng + offset]], {
+      color: c, weight: 7, opacity: 0.9
+    });
+    line.on('click', () => selectPermit(p.id));
+    line.addTo(map);
+    const dot = L.circleMarker([p.lat, p.lng], {
+      radius: 6, color: '#fff', weight: 2, fillColor: c, fillOpacity: 1
+    });
+    dot.on('click', () => selectPermit(p.id));
+    dot.addTo(map);
+    mapLayers.push(line, dot);
+  });
+  renderSidebar();
+  renderStats();
+}
+
+function selectPermit(id) {
+  selectedId = id;
+  const p = permits.find(x => x.id === id);
+  if (!p) return;
+  renderSidebar();
+  showInfoBox(p);
+  if (p.lat && p.lng) map.setView([p.lat, p.lng], 16);
+}
+
+function showInfoBox(p) {
+  const s = statusLabel(p);
+  document.getElementById('ib-street').textContent = p.street;
+  document.getElementById('ib-body').innerHTML = `
+    <div class="info-row"><span>Cross:</span>${p.cross || '—'}</div>
+    <div class="info-row"><span>Event date:</span>${p.eventdate || '—'}</div>
+    <div class="info-row"><span>Hours:</span>${p.hours || '—'}</div>
+    <div class="info-row"><span>Received:</span>${p.received || '—'}</div>
+    <div class="info-row"><span>Approved:</span>${p.approved || 'Pending'}</div>
+    <div class="info-row"><span>Applicant:</span>${p.applicant || '—'}</div>
+    <div class="info-row"><span>Contact:</span>${p.contact || '—'}</div>
+    <div style="margin-top:8px"><span class="badge" style="background:${s.bg};color:${s.color}">${s.text}</span></div>
+    ${p.activities ? `<p style="margin-top:8px;font-size:12px;color:#6b7280">${p.activities}</p>` : ''}
+  `;
+  document.getElementById('info-box').classList.add('open');
+}
+
+// ── SIDEBAR ───────────────────────────────────────────────────────────────
+function renderSidebar(filter) {
+  const q = (filter || document.getElementById('sb-search').value || '').toLowerCase();
+  const list = permits.filter(p => !q || p.street.toLowerCase().includes(q) || (p.applicant||'').toLowerCase().includes(q));
+  document.getElementById('sb-count').textContent = list.length;
+  document.getElementById('sb-list').innerHTML = list.map(p => `
+    <div class="permit-card${p.id === selectedId ? ' selected' : ''}" onclick="selectPermit(${p.id})">
+      <h4>${p.street}</h4>
+      <div class="meta">${p.eventdate || 'No date'} · ${p.hours || ''}</div>
+      ${badge(p)}
+    </div>
+  `).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('sb-search').addEventListener('input', e => renderSidebar(e.target.value));
+});
+
+// ── STATS ─────────────────────────────────────────────────────────────────
+function renderStats() {
+  const total = permits.length;
+  const approved = permits.filter(p => p.approved).length;
+  const urgent = permits.filter(p => {
+    if (!p.approved) return false;
+    const days = (new Date(p.eventdate+'T00:00:00') - new Date()) / 86400000;
+    return days > 0 && days <= 7;
+  }).length;
+  document.getElementById('stats-bar').innerHTML = `
+    <div class="stat"><strong>${total}</strong> total applications</div>
+    <div class="stat"><strong>${approved}</strong> approved</div>
+    <div class="stat"><strong>${total - approved}</strong> pending</div>
+    ${urgent ? `<div class="stat" style="color:#b91c1c"><strong>${urgent}</strong> event within 1 week ⚠️</div>` : ''}
+  `;
+}
+
+// ── FORM / MODALS ─────────────────────────────────────────────────────────
+function openAddModal() {
+  document.getElementById('add-modal').classList.add('open');
+  pickingCoord = false;
+}
+
+function openViewModal() {
+  renderViewTable();
+  document.getElementById('view-modal').classList.add('open');
+}
+
+function closeModals() {
+  document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('open'));
+  pickingCoord = false;
+}
+
+function submitForm() {
+  const street = document.getElementById('f-street').value.trim();
+  const eventdate = document.getElementById('f-eventdate').value;
+  if (!street) { alert('Street/block name is required.'); return; }
+  if (!eventdate) { alert('Event date is required.'); return; }
+  const lat = parseFloat(document.getElementById('f-lat').value);
+  const lng = parseFloat(document.getElementById('f-lng').value);
+  const p = {
+    id: Date.now(),
+    received:  document.getElementById('f-received').value,
+    approved:  document.getElementById('f-approved').value,
+    street,
+    cross:     document.getElementById('f-cross').value,
+    eventdate,
+    hours:     document.getElementById('f-hours').value,
+    activities:document.getElementById('f-activities').value,
+    applicant: document.getElementById('f-applicant').value,
+    contact:   document.getElementById('f-contact').value,
+    lat: isNaN(lat) ? null : lat,
+    lng: isNaN(lng) ? null : lng,
+  };
+  permits.push(p);
+  saveLocalExtras();
+  renderMap();
+  closeModals();
+  clearForm();
+}
+
+function clearForm() {
+  ['f-received','f-approved','f-street','f-cross','f-eventdate','f-hours','f-activities','f-applicant','f-contact','f-lat','f-lng'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('coord-status').textContent = '';
+}
+
+function renderViewTable() {
+  const sorted = [...permits].sort((a,b) => (a.eventdate||'').localeCompare(b.eventdate||''));
+  document.getElementById('ptbody').innerHTML = sorted.map(p => {
+    const s = statusLabel(p);
+    return `<tr>
+      <td><strong>${p.street}</strong><br><span style="font-size:11px;color:#9ca3af">${p.cross||''}</span></td>
+      <td>${p.eventdate||'—'}</td>
+      <td>${p.hours||'—'}</td>
+      <td><span class="badge" style="background:${s.bg};color:${s.color}">${s.text}</span></td>
+      <td>${p.received||'—'}</td>
+      <td>${p.approved||'Pending'}</td>
+      <td>${p.applicant||'—'}<br><span style="font-size:11px;color:#9ca3af">${p.contact||''}</span></td>
+      <td style="max-width:180px;font-size:12px;color:#6b7280">${p.activities||'—'}</td>
+      <td><button class="btn danger" style="font-size:11px;padding:4px 8px" onclick="deletePermit(${p.id})">Delete</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function deletePermit(id) {
+  if (!confirm('Delete this permit application?')) return;
+  permits = permits.filter(p => p.id !== id);
+  saveLocalExtras();
+  renderMap();
+  renderViewTable();
+}
+
+// ── COORD PICK ────────────────────────────────────────────────────────────
+// (clicking the map while add modal is open - handled via pickingCoord flag)
+// Add a "pick from map" button
+document.addEventListener('DOMContentLoaded', () => {
+  const hint = document.querySelector('.form-hint');
+  const btn = document.createElement('button');
+  btn.className = 'btn';
+  btn.id = 'pick-btn';
+  btn.textContent = '📍 Click map to place';
+  btn.onclick = function() {
+    closeModals();
+    pickingCoord = true;
+    document.getElementById('coord-status').textContent = 'Click on the map to set location...';
+  };
+  hint.parentNode.insertBefore(btn, hint);
+});
+
+// ── CSV EXPORT ────────────────────────────────────────────────────────────
+function exportCSV() {
+  const headers = ['Street','Cross Streets','Event Date','Hours','Received','Approved','Applicant','Contact','Activities','Lat','Lng'];
+  const rows = permits.map(p => [
+    p.street, p.cross, p.eventdate, p.hours, p.received, p.approved,
+    p.applicant, p.contact, p.activities, p.lat, p.lng
+  ].map(v => `"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `block_party_permits_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ── KEYBOARD ──────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModals();
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+permits = loadPermits();
+initMap();
+renderMap();
+</script>
+</body>
+</html>
