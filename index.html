@@ -3,150 +3,205 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Block Party Permit Tracker</title>
+<title>City of Berkeley — Block Party Permit Tracker</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#1a1a1a}
+  html,body{height:100%;overflow:hidden}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f4;color:#1a1a1a;display:flex;flex-direction:column}
 
-  /* ── Header ── */
-  header{background:#1e3a5f;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  header h1{font-size:18px;font-weight:600;flex:1}
-  header .btn{padding:7px 16px;border-radius:6px;border:none;font-size:13px;cursor:pointer;font-weight:500}
-  .btn-outline{background:transparent;border:1px solid rgba(255,255,255,0.5)!important;color:#fff}
-  .btn-outline:hover{background:rgba(255,255,255,0.1)}
-  .btn-primary{background:#3b82f6;color:#fff}
-  .btn-primary:hover{background:#2563eb}
+  /* ── Berkeley brand palette ────────────────────────────────────────────────
+     #0D1D29  dark navy      #3b7b9b  primary blue   #8EB9CE  light blue
+     #679F35  green          #3A3C8E  dark purple    #52679D  mid purple
+     #C8113D  red            #E0911A  orange
+     #231F20  dark gray      #414042  mid gray
+  ── */
 
-  /* ── Stats bar ── */
-  #stats-bar{background:#fff;border-bottom:1px solid #e5e7eb;padding:8px 20px;display:flex;gap:24px;flex-wrap:wrap;font-size:13px}
-  .stat{color:#6b7280}.stat strong{color:#111827}
+  header{background:#0D1D29;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex-shrink:0;border-bottom:3px solid #3b7b9b}
+  header h1{font-size:17px;font-weight:700;flex:1;letter-spacing:.01em}
+  header h1 span{color:#8EB9CE;font-weight:400;font-size:12px;display:block;margin-top:1px}
+  .hbtn{padding:6px 14px;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;border:1.5px solid rgba(255,255,255,.35);background:transparent;color:#fff}
+  .hbtn:hover{background:rgba(255,255,255,.1)}
+  .hbtn.accent{background:#3b7b9b;border-color:#3b7b9b}
+  .hbtn.accent:hover{background:#2e6382}
 
-  /* ── Layout ── */
-  #main{display:flex;height:calc(100vh - 110px);min-height:400px}
-  #map{flex:1;min-height:300px}
-  #sidebar{width:300px;background:#fff;border-left:1px solid #e5e7eb;overflow-y:auto;flex-shrink:0}
+  #stats-bar{background:#fff;border-bottom:1px solid #d8dde3;padding:6px 20px;display:flex;gap:20px;flex-wrap:wrap;font-size:12px;flex-shrink:0}
+  .stat{color:#414042}.stat strong{color:#0D1D29}
+  .stat.urgent strong{color:#C8113D}
 
-  /* ── Sidebar ── */
-  #sidebar-header{padding:12px 16px;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:600;color:#374151;display:flex;justify-content:space-between;align-items:center}
-  .permit-card{padding:12px 16px;border-bottom:1px solid #f3f4f6;cursor:pointer;transition:background 0.1s}
-  .permit-card:hover{background:#f9fafb}
-  .permit-card.selected{background:#eff6ff;border-left:3px solid #3b82f6}
-  .permit-card h4{font-size:13px;font-weight:600;margin-bottom:4px;color:#111827}
-  .permit-card .meta{font-size:11px;color:#9ca3af}
-  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-top:4px}
+  #main{display:flex;flex:1;overflow:hidden;min-height:0}
+  #map-wrap{position:relative;flex:1;overflow:hidden}
+  #map{height:100%;width:100%}
+  #sidebar{width:290px;background:#fff;border-left:1px solid #d8dde3;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
 
-  /* ── Legend ── */
-  #legend{background:#fff;border-top:1px solid #e5e7eb;padding:8px 20px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px;color:#6b7280}
-  .leg{display:flex;align-items:center;gap:6px}
-  .leg-bar{width:26px;height:5px;border-radius:3px}
+  #sidebar-header{padding:10px 14px;border-bottom:1px solid #d8dde3;font-size:11px;font-weight:700;color:#0D1D29;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:#f7f8fa;text-transform:uppercase;letter-spacing:.05em}
+  #sb-list{flex:1;overflow-y:auto}
+  .permit-card{padding:11px 14px;border-bottom:1px solid #eef0f3;cursor:pointer;transition:background .1s}
+  .permit-card:hover{background:#f0f5f9}
+  .permit-card.selected{background:#e3edf5;border-left:3px solid #3b7b9b}
+  .permit-card h4{font-size:12px;font-weight:700;margin-bottom:3px;color:#0D1D29;line-height:1.3}
+  .permit-card .meta{font-size:11px;color:#8a8f96}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;margin-top:4px}
 
-  /* ── Info popup ── */
-  #info-box{position:absolute;bottom:50px;left:20px;z-index:1000;background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14px 16px;max-width:260px;display:none}
+  #legend{background:#0D1D29;padding:6px 18px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:11px;flex-shrink:0}
+  #legend strong{color:#fff;font-size:11px;margin-right:2px}
+  .leg{display:flex;align-items:center;gap:5px;color:#c0cdd5}
+  .leg-bar{width:24px;height:5px;border-radius:3px}
+
+  #info-box{position:absolute;bottom:16px;left:16px;z-index:1000;background:#fff;border-radius:8px;box-shadow:0 4px 18px rgba(13,29,41,.2);padding:13px 15px;max-width:270px;display:none;border-top:3px solid #3b7b9b}
   #info-box.open{display:block}
-  #info-box h4{font-size:14px;font-weight:600;margin-bottom:8px}
-  .info-row{display:flex;gap:8px;font-size:12px;margin:3px 0;color:#6b7280}
-  .info-row span:first-child{font-weight:600;color:#374151;min-width:72px}
-  #info-close{position:absolute;top:8px;right:10px;background:none;border:none;font-size:18px;cursor:pointer;color:#9ca3af}
+  #info-box h4{font-size:13px;font-weight:700;margin-bottom:7px;color:#0D1D29;padding-right:20px}
+  .info-row{display:flex;gap:7px;font-size:11px;margin:3px 0;color:#414042}
+  .info-row span:first-child{font-weight:700;color:#0D1D29;min-width:70px;flex-shrink:0}
+  #info-close{position:absolute;top:8px;right:10px;background:none;border:none;font-size:17px;cursor:pointer;color:#9ca3af}
 
-  /* ── Modal ── */
-  .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;align-items:center;justify-content:center}
+  .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(13,29,41,.55);z-index:9000;align-items:center;justify-content:center}
   .modal-backdrop.open{display:flex}
-  .modal{background:#fff;border-radius:12px;padding:24px;width:min(560px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
-  .modal h2{font-size:17px;font-weight:600;margin-bottom:18px}
-  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .form-group{display:flex;flex-direction:column;gap:5px}
+  .modal{background:#fff;border-radius:10px;padding:22px;width:min(620px,96vw);max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(13,29,41,.25);border-top:4px solid #3b7b9b}
+  .modal h2{font-size:16px;font-weight:700;margin-bottom:16px;color:#0D1D29}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .form-group{display:flex;flex-direction:column;gap:4px}
   .form-group.full{grid-column:1/-1}
-  label{font-size:12px;font-weight:600;color:#374151}
-  input,select,textarea{font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#111827;width:100%;outline:none}
-  input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
-  textarea{resize:vertical;min-height:70px}
-  .form-hint{font-size:11px;color:#9ca3af;margin-top:2px}
-  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f3f4f6}
-  .btn{padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;border:1px solid #e5e7eb;background:#fff;color:#374151}
-  .btn:hover{background:#f9fafb}
-  .btn.primary{background:#1e3a5f;color:#fff;border-color:#1e3a5f}
-  .btn.primary:hover{background:#16304f}
-  .btn.danger{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
-  .btn.danger:hover{background:#fecaca}
+  .form-section{grid-column:1/-1;font-size:10px;font-weight:700;color:#3b7b9b;text-transform:uppercase;letter-spacing:.07em;padding-top:8px;border-top:1px solid #eef0f3;margin-top:2px}
+  label{font-size:11px;font-weight:700;color:#414042;text-transform:uppercase;letter-spacing:.04em}
+  input,select,textarea{font-size:13px;padding:8px 10px;border:1px solid #c8cdd4;border-radius:5px;background:#fff;color:#111827;width:100%;outline:none;font-family:inherit}
+  input:focus,select:focus,textarea:focus{border-color:#3b7b9b;box-shadow:0 0 0 3px rgba(59,123,155,.12)}
+  textarea{resize:vertical;min-height:66px}
+  .form-hint{font-size:11px;color:#8a8f96;margin-top:3px;line-height:1.4}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid #eef0f3}
 
-  /* ── Table view ── */
-  #permit-table-wrap{overflow-x:auto;max-height:60vh}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th{text-align:left;padding:8px 10px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #e5e7eb;background:#f9fafb;position:sticky;top:0}
-  td{padding:9px 10px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
-  tr:hover td{background:#f9fafb}
+  .btn{padding:7px 15px;border-radius:5px;font-size:12px;cursor:pointer;font-weight:700;border:1.5px solid #c8cdd4;background:#fff;color:#414042;font-family:inherit}
+  .btn:hover{background:#f7f8fa}
+  .btn.primary{background:#3b7b9b;color:#fff;border-color:#3b7b9b}
+  .btn.primary:hover{background:#2e6382}
+  .btn.success{background:#679F35;color:#fff;border-color:#679F35}
+  .btn.success:hover{background:#558a29}
+  .btn.danger{background:#fde8ec;color:#C8113D;border-color:#f5b8c4}
+  .btn.danger:hover{background:#fad0d8}
+  .btn.edit{background:#eaecf8;color:#3A3C8E;border-color:#b8bde0}
+  .btn.edit:hover{background:#d9dcf2}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
 
-  /* ── Coord picker ── */
-  #coord-status{font-size:11px;color:#3b82f6;margin-top:4px;min-height:16px}
-  #pick-btn{font-size:11px;padding:4px 10px;margin-top:4px}
+  #permit-table-wrap{overflow-x:auto;max-height:58vh}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;padding:7px 9px;font-size:10px;font-weight:700;color:#3b7b9b;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #d8dde3;background:#f7f8fa;position:sticky;top:0}
+  td{padding:8px 9px;border-bottom:1px solid #eef0f3;vertical-align:middle;color:#231F20}
+  tr:hover td{background:#f7f9fb}
 
-  /* ── Responsive ── */
-  @media(max-width:640px){
+  #coord-status{min-height:18px;margin-top:5px}
+  .rs{font-size:11px;padding:3px 9px;border-radius:4px;display:inline-block}
+  .rs.loading{background:#e8eef6;color:#3A3C8E}
+  .rs.ok{background:#edf6e5;color:#3d6e1a}
+  .rs.warn{background:#fef4e6;color:#7a4a08}
+  .rs.error{background:#fde8ec;color:#C8113D}
+
+  .addr-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+
+  /* ── Auth ── */
+  #login-modal .modal{width:min(400px,96vw);border-top-color:#0D1D29}
+  #login-modal .modal h2{text-align:center;margin-bottom:6px}
+  .login-sub{font-size:12px;color:#8a8f96;text-align:center;margin-bottom:20px}
+  #login-error{font-size:12px;color:#C8113D;text-align:center;min-height:18px;margin-top:6px}
+  #auth-indicator{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,.85)}
+  .auth-avatar{width:28px;height:28px;border-radius:50%;background:#3b7b9b;border:2px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+  .auth-name{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sign-out-btn{font-size:11px;color:rgba(255,255,255,.55);cursor:pointer;text-decoration:underline;background:none;border:none;padding:0;font-family:inherit}
+  .sign-out-btn:hover{color:#fff}
+
+  @media(max-width:680px){
     #sidebar{display:none}
-    .form-grid{grid-template-columns:1fr}
+    .form-grid,.addr-pair{grid-template-columns:1fr}
   }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🎉 Block Party Permit Tracker</h1>
-  <button class="btn btn-outline" onclick="openViewModal()">📋 View All</button>
-  <button class="btn btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
-  <button class="btn btn-primary" onclick="openAddModal()">+ New Application</button>
+  <h1>Block Party Permit Tracker <span>City of Berkeley — Public Works</span></h1>
+  <button class="hbtn" onclick="openViewModal()">&#9776; View All</button>
+  <button class="hbtn" onclick="exportCSV()">&#8595; Export CSV</button>
+  <div id="auth-indicator"></div>
 </header>
 
 <div id="stats-bar"></div>
 
 <div id="main">
-  <div style="position:relative;flex:1">
+  <div id="map-wrap">
     <div id="map"></div>
     <div id="info-box">
-      <button id="info-close" onclick="document.getElementById('info-box').classList.remove('open')">×</button>
+      <button id="info-close" onclick="document.getElementById('info-box').classList.remove('open')">&#215;</button>
       <h4 id="ib-street"></h4>
       <div id="ib-body"></div>
     </div>
   </div>
   <div id="sidebar">
     <div id="sidebar-header">
-      <span>Applications (<span id="sb-count">0</span>)</span>
-      <input type="text" id="sb-search" placeholder="Search..." style="width:120px;font-size:12px;padding:4px 8px">
+      <span>Permits (<span id="sb-count">0</span>)</span>
+      <input type="text" id="sb-search" placeholder="Search..." style="width:105px;font-size:11px;padding:4px 7px;text-transform:none;letter-spacing:0">
     </div>
     <div id="sb-list"></div>
   </div>
 </div>
 
 <div id="legend">
-  <strong style="color:#374151">Color key:</strong>
-  <div class="leg"><div class="leg-bar" style="background:#9ca3af"></div>Pending approval</div>
-  <div class="leg"><div class="leg-bar" style="background:#ef4444"></div>≤1 week</div>
-  <div class="leg"><div class="leg-bar" style="background:#f97316"></div>≤2 weeks</div>
-  <div class="leg"><div class="leg-bar" style="background:#eab308"></div>≤3 weeks</div>
-  <div class="leg"><div class="leg-bar" style="background:#3b82f6"></div>≤4 weeks</div>
+  <strong>Closure color key:</strong>
+  <div class="leg"><div class="leg-bar" style="background:#8a8f96"></div>Pending approval</div>
+  <div class="leg"><div class="leg-bar" style="background:#C8113D"></div>&#8804;1 week</div>
+  <div class="leg"><div class="leg-bar" style="background:#E0911A"></div>&#8804;2 weeks</div>
+  <div class="leg"><div class="leg-bar" style="background:#679F35"></div>&#8804;3 weeks</div>
+  <div class="leg"><div class="leg-bar" style="background:#3b7b9b"></div>&#8804;4+ weeks</div>
 </div>
 
-<!-- ADD MODAL -->
+<!-- ══ LOGIN MODAL ════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="login-modal">
+  <div class="modal">
+    <h2>Editor Sign In</h2>
+    <p class="login-sub">City of Berkeley — Block Party Permit Tracker</p>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="form-group">
+        <label>Your Name</label>
+        <input type="text" id="login-name" placeholder="e.g. Jane Smith" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label>Editor Passcode</label>
+        <input type="password" id="login-pass" placeholder="Enter passcode" autocomplete="current-password">
+      </div>
+      <div id="login-error"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeLoginModal()">Cancel</button>
+      <button class="btn primary" onclick="attemptLogin()">Sign In</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADD / EDIT MODAL ══════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="add-modal">
   <div class="modal">
-    <h2>New Block Party Application</h2>
+    <h2 id="form-title">New Block Party Application</h2>
+    <input type="hidden" id="f-edit-id">
     <div class="form-grid">
+
+      <div class="form-section">Application Info</div>
       <div class="form-group">
-        <label>Date Application Received *</label>
+        <label>Date Received *</label>
         <input type="date" id="f-received">
       </div>
       <div class="form-group">
-        <label>Date Approved (leave blank if pending)</label>
+        <label>Date Approved (blank = pending)</label>
         <input type="date" id="f-approved">
       </div>
-      <div class="form-group full">
-        <label>Street / Block to be Closed *</label>
-        <input type="text" id="f-street" placeholder="e.g. 400 block of Oak St">
+      <div class="form-group">
+        <label>Applicant Name</label>
+        <input type="text" id="f-applicant" placeholder="Full name">
       </div>
-      <div class="form-group full">
-        <label>Bounding Cross Streets</label>
-        <input type="text" id="f-cross" placeholder="e.g. Elm Ave & Maple Ave">
+      <div class="form-group">
+        <label>Contact Phone / Email</label>
+        <input type="text" id="f-contact" placeholder="Phone or email">
       </div>
+
+      <div class="form-section">Event Details</div>
       <div class="form-group">
         <label>Event Date *</label>
         <input type="date" id="f-eventdate">
@@ -156,26 +211,57 @@
         <input type="text" id="f-hours" placeholder="e.g. 12:00 PM – 6:00 PM">
       </div>
       <div class="form-group full">
+        <label>Street / Block Description *</label>
+        <input type="text" id="f-street" placeholder="e.g. 400 block of Oak St">
+      </div>
+      <div class="form-group full">
         <label>Planned Activities</label>
         <textarea id="f-activities" placeholder="Live music, food vendors, bounce house, games..."></textarea>
       </div>
-      <div class="form-group full">
-        <label>Map Location</label>
-        <div style="display:flex;gap:8px">
-          <input type="number" id="f-lat" placeholder="Latitude" step="any">
-          <input type="number" id="f-lng" placeholder="Longitude" step="any">
+
+      <!-- ── STREET CLOSURE MAPPING ──────────────────────────────────────── -->
+      <div class="form-section">Street Closure — Map Location</div>
+      <div class="form-group full" style="background:#f7f8fa;border:1px solid #d8dde3;border-radius:6px;padding:12px">
+
+        <p style="font-size:12px;color:#231F20;margin-bottom:10px;line-height:1.5">
+          Enter the <strong>address at each end</strong> of the closed block — the house numbers at the two corners where barricades will be placed. Then click <strong>Draw Closure on Map</strong>.
+        </p>
+
+        <div class="addr-pair">
+          <div class="form-group">
+            <label>Start Address (one end of closure)</label>
+            <input type="text" id="f-addr1" placeholder="e.g. 401 Oak St, Berkeley, CA">
+            <p class="form-hint">House number at the first barricade</p>
+          </div>
+          <div class="form-group">
+            <label>End Address (other end of closure)</label>
+            <input type="text" id="f-addr2" placeholder="e.g. 499 Oak St, Berkeley, CA">
+            <p class="form-hint">House number at the second barricade</p>
+          </div>
         </div>
-        <p class="form-hint">Close this dialog and click the map to auto-place, or enter coordinates manually.</p>
+
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn primary" id="fetch-route-btn" onclick="fetchAndDrawRoute()">
+            &#128205; Draw Closure on Map
+          </button>
+          <span style="font-size:11px;color:#8a8f96">— or —</span>
+          <button class="btn" id="pick-btn">Click map to place point</button>
+        </div>
         <div id="coord-status"></div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div class="form-group" style="flex:1">
+            <label>Lat (auto-filled)</label>
+            <input type="number" id="f-lat" placeholder="Latitude" step="any">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Lng (auto-filled)</label>
+            <input type="number" id="f-lng" placeholder="Longitude" step="any">
+          </div>
+        </div>
+        <p class="form-hint" style="margin-top:5px">If addresses can't be found automatically, use the map click to place a center point — a short line will appear on the nearest road.</p>
       </div>
-      <div class="form-group full">
-        <label>Applicant Name</label>
-        <input type="text" id="f-applicant" placeholder="Full name">
-      </div>
-      <div class="form-group full">
-        <label>Contact Phone / Email</label>
-        <input type="text" id="f-contact" placeholder="Phone or email">
-      </div>
+
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModals()">Cancel</button>
@@ -184,15 +270,15 @@
   </div>
 </div>
 
-<!-- VIEW ALL MODAL -->
+<!-- ══ VIEW ALL MODAL ════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="view-modal">
-  <div class="modal" style="width:min(820px,96vw)">
+  <div class="modal" style="width:min(940px,97vw)">
     <h2>All Permit Applications</h2>
     <div id="permit-table-wrap">
-      <table id="permit-table">
+      <table>
         <thead>
           <tr>
-            <th>Street</th>
+            <th>Street / Block</th>
             <th>Event Date</th>
             <th>Hours</th>
             <th>Status</th>
@@ -200,7 +286,7 @@
             <th>Approved</th>
             <th>Applicant</th>
             <th>Activities</th>
-            <th></th>
+            <th style="min-width:130px"></th>
           </tr>
         </thead>
         <tbody id="ptbody"></tbody>
@@ -208,118 +294,199 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModals()">Close</button>
-      <button class="btn primary" onclick="exportCSV()">Export CSV</button>
+      <button class="btn success" onclick="exportCSV()">Export CSV</button>
     </div>
   </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ── DATA ──────────────────────────────────────────────────────────────────
-// HOW TO ADD PERMITS WITHOUT THE UI:
-// Add objects to the STATIC_PERMITS array below, following the same format.
-// Each permit needs a unique id (just increment the number).
-// lat/lng = the center of the block to close.
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTHENTICATION
+// ─────────────────────────────────────────────────────────────────────────
+// Client-side passcode gate. Change EDITOR_PASSCODE to your chosen password.
+// Sessions persist for 8 hours via sessionStorage.
+// This is security-by-obscurity appropriate for an internal tool —
+// not cryptographic auth. Anyone with the source can find the passcode,
+// so keep the GitHub repo private or treat the passcode as low-stakes.
+// ═══════════════════════════════════════════════════════════════════════════
+const EDITOR_PASSCODE = 'berkeley2026';  // ← CHANGE THIS
+
+const AUTH_KEY = 'berk_bp_auth';
+const AUTH_TTL = 8 * 60 * 60 * 1000; // 8 hours in ms
+
+let currentEditor = null; // { name, loginTime } when signed in
+
+function loadAuth() {
+  try {
+    const raw = sessionStorage.getItem(AUTH_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (Date.now() - data.loginTime > AUTH_TTL) { sessionStorage.removeItem(AUTH_KEY); return; }
+    currentEditor = data;
+  } catch {}
+}
+
+function saveAuth(name) {
+  currentEditor = { name, loginTime: Date.now() };
+  try { sessionStorage.setItem(AUTH_KEY, JSON.stringify(currentEditor)); } catch {}
+}
+
+function signOut() {
+  currentEditor = null;
+  try { sessionStorage.removeItem(AUTH_KEY); } catch {}
+  renderAuthIndicator();
+}
+
+function isEditor() { return currentEditor !== null; }
+
+// Initials from a name string
+function initials(name) {
+  return name.trim().split(/\s+/).map(w => w[0].toUpperCase()).slice(0, 2).join('');
+}
+
+function renderAuthIndicator() {
+  const el = document.getElementById('auth-indicator');
+  if (isEditor()) {
+    el.innerHTML = `
+      <div class="auth-avatar">${initials(currentEditor.name)}</div>
+      <span class="auth-name">${currentEditor.name}</span>
+      <button class="sign-out-btn" onclick="signOut()">Sign out</button>
+      <button class="hbtn accent" onclick="openAddModal()" style="margin-left:4px">+ New Application</button>
+    `;
+  } else {
+    el.innerHTML = `
+      <button class="hbtn" onclick="openLoginModal()">&#128274; Editor Sign In</button>
+    `;
+  }
+}
+
+function openLoginModal() {
+  document.getElementById('login-name').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-modal').classList.add('open');
+  setTimeout(() => document.getElementById('login-name').focus(), 50);
+}
+
+function closeLoginModal() {
+  document.getElementById('login-modal').classList.remove('open');
+}
+
+function attemptLogin() {
+  const name = document.getElementById('login-name').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  if (!name) { errEl.textContent = 'Please enter your name.'; return; }
+  if (pass !== EDITOR_PASSCODE) {
+    errEl.textContent = 'Incorrect passcode. Please try again.';
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-pass').focus();
+    return;
+  }
+  saveAuth(name);
+  closeLoginModal();
+  renderAuthIndicator();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA
+// ─────────────────────────────────────────────────────────────────────────
+// To add permits without the UI, append to STATIC_PERMITS.
+// addr1 / addr2 = the two street addresses at each end of the closed block.
+//   Use full addresses: "401 Oak St, Berkeley, CA"
+// routeCoords = auto-populated on first load; leave null.
+// ═══════════════════════════════════════════════════════════════════════════
 const STATIC_PERMITS = [
   {
     id: 1,
-    received: '2026-03-01',
-    approved: '2026-03-10',
+    received: '2026-03-01', approved: '2026-03-10',
     street: '400 block of Oak St',
-    cross: 'Elm Ave & Maple Ave',
-    eventdate: '2026-03-30',
-    hours: '12:00 PM – 6:00 PM',
+    addr1: '401 Oak St, Berkeley, CA',
+    addr2: '499 Oak St, Berkeley, CA',
+    eventdate: '2026-03-30', hours: '12:00 PM – 6:00 PM',
     activities: 'Live music, food vendors, bounce house',
-    applicant: 'Jane Smith',
-    contact: 'jane@example.com',
-    lat: 37.871,
-    lng: -122.273
+    applicant: 'Jane Smith', contact: 'jane@example.com',
+    lat: null, lng: null, routeCoords: null
   },
   {
     id: 2,
-    received: '2026-03-05',
-    approved: '2026-03-12',
-    street: '200 block of Pine Ave',
-    cross: '1st St & 2nd St',
-    eventdate: '2026-04-05',
-    hours: '10:00 AM – 4:00 PM',
+    received: '2026-03-05', approved: '2026-03-12',
+    street: '1700 block of McGee Ave',
+    addr1: '1700 McGee Ave, Berkeley, CA',
+    addr2: '1798 McGee Ave, Berkeley, CA',
+    eventdate: '2026-04-05', hours: '10:00 AM – 4:00 PM',
     activities: 'Community cookout, kids games, raffle',
-    applicant: 'Robert Johnson',
-    contact: '555-0142',
-    lat: 37.868,
-    lng: -122.268
+    applicant: 'Robert Johnson', contact: '555-0142',
+    lat: null, lng: null, routeCoords: null
   },
   {
     id: 3,
-    received: '2026-03-10',
-    approved: '',
-    street: '600 block of Cedar Blvd',
-    cross: 'Park St & Garden St',
-    eventdate: '2026-04-18',
-    hours: '2:00 PM – 8:00 PM',
+    received: '2026-03-10', approved: '',
+    street: '2400 block of Dwight Way',
+    addr1: '2400 Dwight Way, Berkeley, CA',
+    addr2: '2498 Dwight Way, Berkeley, CA',
+    eventdate: '2026-04-18', hours: '2:00 PM – 8:00 PM',
     activities: 'Block dance, potluck dinner',
-    applicant: 'Maria Garcia',
-    contact: 'mgarcia@mail.com',
-    lat: 37.874,
-    lng: -122.279
+    applicant: 'Maria Garcia', contact: 'mgarcia@mail.com',
+    lat: null, lng: null, routeCoords: null
   },
   {
     id: 4,
-    received: '2026-03-15',
-    approved: '2026-03-20',
-    street: '100 block of Birch Ln',
-    cross: 'Main St & 1st Ave',
-    eventdate: '2026-04-10',
-    hours: '11:00 AM – 5:00 PM',
+    received: '2026-03-15', approved: '2026-03-20',
+    street: '800 block of Bancroft Way',
+    addr1: '800 Bancroft Way, Berkeley, CA',
+    addr2: '898 Bancroft Way, Berkeley, CA',
+    eventdate: '2026-04-10', hours: '11:00 AM – 5:00 PM',
     activities: 'Craft fair, petting zoo, food trucks',
-    applicant: 'Tom Lee',
-    contact: '555-0199',
-    lat: 37.865,
-    lng: -122.261
+    applicant: 'Tom Lee', contact: '555-0199',
+    lat: null, lng: null, routeCoords: null
   }
 ];
 
-// ── STATE ─────────────────────────────────────────────────────────────────
-const LS_KEY = 'blockparty_v2';
+// ── State ──────────────────────────────────────────────────────────────────
+const LS_KEY = 'berk_bp_v4';
 let permits = [];
 let mapLayers = [];
 let selectedId = null;
 let pickingCoord = false;
+window._pendingRoute = null;
 
 function loadPermits() {
   try {
     const saved = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
-    // Merge: STATIC_PERMITS are authoritative by id; local additions are appended
     const staticIds = new Set(STATIC_PERMITS.map(p => p.id));
-    const localExtras = saved.filter(p => !staticIds.has(p.id));
-    return [...STATIC_PERMITS, ...localExtras];
+    const extras = saved.filter(p => !staticIds.has(p.id));
+    const merged = STATIC_PERMITS.map(sp => {
+      const edit = saved.find(s => s.id === sp.id);
+      return edit ? { ...sp, ...edit } : sp;
+    });
+    return [...merged, ...extras];
   } catch { return [...STATIC_PERMITS]; }
 }
 
-function saveLocalExtras() {
-  const staticIds = new Set(STATIC_PERMITS.map(p => p.id));
-  const extras = permits.filter(p => !staticIds.has(p.id));
-  try { localStorage.setItem(LS_KEY, JSON.stringify(extras)); } catch {}
+function savePermits() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(permits)); } catch {}
 }
 
-// ── COLOR LOGIC ───────────────────────────────────────────────────────────
+// ── Berkeley colors ────────────────────────────────────────────────────────
 function getColor(p) {
-  if (!p.approved) return '#9ca3af';
+  if (!p.approved) return '#8a8f96';
   const days = (new Date(p.eventdate + 'T00:00:00') - new Date()) / 86400000;
-  if (days <= 7)  return '#ef4444';
-  if (days <= 14) return '#f97316';
-  if (days <= 21) return '#eab308';
-  return '#3b82f6';
+  if (days <= 7)  return '#C8113D';
+  if (days <= 14) return '#E0911A';
+  if (days <= 21) return '#679F35';
+  return '#3b7b9b';
 }
 
 function statusLabel(p) {
-  if (!p.approved) return { text: 'Pending', bg: '#f3f4f6', color: '#6b7280' };
+  if (!p.approved) return { text: 'Pending', bg: '#eef0f3', color: '#414042' };
   const days = Math.round((new Date(p.eventdate + 'T00:00:00') - new Date()) / 86400000);
-  if (days <= 0)  return { text: 'Past', bg: '#f3f4f6', color: '#6b7280' };
-  if (days <= 7)  return { text: `${days}d — urgent`, bg: '#fee2e2', color: '#b91c1c' };
-  if (days <= 14) return { text: `${days}d`, bg: '#ffedd5', color: '#c2410c' };
-  if (days <= 21) return { text: `${days}d`, bg: '#fef9c3', color: '#854d0e' };
-  return { text: `${days}d`, bg: '#dbeafe', color: '#1d4ed8' };
+  if (days <= 0)  return { text: 'Past event', bg: '#eef0f3', color: '#8a8f96' };
+  if (days <= 7)  return { text: `${days}d — urgent`, bg: '#fde8ec', color: '#C8113D' };
+  if (days <= 14) return { text: `${days}d`, bg: '#fdf0e0', color: '#7a4a08' };
+  if (days <= 21) return { text: `${days}d`, bg: '#edf6e5', color: '#3d6e1a' };
+  return { text: `${days}d`, bg: '#deedf5', color: '#1f5574' };
 }
 
 function badge(p) {
@@ -327,18 +494,158 @@ function badge(p) {
   return `<span class="badge" style="background:${s.bg};color:${s.color}">${s.text}</span>`;
 }
 
-// ── MAP ───────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// GEOCODING + ROUTING
+// ─────────────────────────────────────────────────────────────────────────
+// Nominatim geocodes full street addresses reliably.
+// OSRM routes between two lat/lng points along real road geometry.
+// Both are free, open-source, no API key required.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Geocode a single full address → { lat, lng } or null
+async function geocodeAddress(addr) {
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q='
+    + encodeURIComponent(addr);
+  try {
+    const r = await fetch(url, { headers: { 'Accept-Language': 'en', 'Accept': 'application/json' } });
+    const d = await r.json();
+    if (!d || !d.length) return null;
+    return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+  } catch { return null; }
+}
+
+// Fetch routed polyline between two points using OSRM public API
+// Returns array of [lat, lng] pairs, or null on failure
+async function fetchOSRMRoute(g1, g2) {
+  const url = `https://router.project-osrm.org/route/v1/driving/`
+    + `${g1.lng},${g1.lat};${g2.lng},${g2.lat}`
+    + `?overview=full&geometries=geojson&steps=false`;
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    if (!d || d.code !== 'Ok' || !d.routes || !d.routes.length) return null;
+    // GeoJSON coords are [lng, lat] — flip for Leaflet
+    return d.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+  } catch { return null; }
+}
+
+// ── Called by the form button ──────────────────────────────────────────────
+async function fetchAndDrawRoute() {
+  const a1 = document.getElementById('f-addr1').value.trim();
+  const a2 = document.getElementById('f-addr2').value.trim();
+  if (!a1 || !a2) {
+    setStatus('Enter both addresses first.', 'warn');
+    return;
+  }
+  const btn = document.getElementById('fetch-route-btn');
+  btn.disabled = true;
+  setStatus('Locating addresses…', 'loading');
+
+  const [g1, g2] = await Promise.all([geocodeAddress(a1), geocodeAddress(a2)]);
+
+  if (!g1) { setStatus(`Could not find: "${a1}". Try adding the city and state.`, 'error'); btn.disabled = false; return; }
+  if (!g2) { setStatus(`Could not find: "${a2}". Try adding the city and state.`, 'error'); btn.disabled = false; return; }
+
+  setStatus('Drawing route along street…', 'loading');
+  const route = await fetchOSRMRoute(g1, g2);
+
+  if (!route || route.length < 2) {
+    // Fallback: straight line between the two geocoded points
+    const straight = [g1, g2].map(g => [g.lat, g.lng]);
+    window._pendingRoute = straight;
+    const mid = [
+      (g1.lat + g2.lat) / 2,
+      (g1.lng + g2.lng) / 2
+    ];
+    document.getElementById('f-lat').value = mid[0].toFixed(6);
+    document.getElementById('f-lng').value = mid[1].toFixed(6);
+    setStatus('Both addresses found but routing failed — drawing straight line between them.', 'warn');
+    btn.disabled = false;
+    return;
+  }
+
+  window._pendingRoute = route;
+  const mid = route[Math.floor(route.length / 2)];
+  document.getElementById('f-lat').value = mid[0].toFixed(6);
+  document.getElementById('f-lng').value = mid[1].toFixed(6);
+  setStatus(`&#10003; Route drawn along street (${route.length} points). Save to confirm.`, 'ok');
+  btn.disabled = false;
+
+  // Preview the route on the map immediately
+  previewRoute(route, getColor({ approved: document.getElementById('f-approved').value, eventdate: document.getElementById('f-eventdate').value }));
+}
+
+let previewLayer = null;
+function previewRoute(coords, color) {
+  if (previewLayer) { map.removeLayer(previewLayer); previewLayer = null; }
+  previewLayer = L.polyline(coords, { color: color || '#3b7b9b', weight: 7, opacity: 0.85, dashArray: '10 5' });
+  previewLayer.addTo(map);
+  map.fitBounds(previewLayer.getBounds(), { padding: [40, 40] });
+}
+
+function clearPreview() {
+  if (previewLayer) { map.removeLayer(previewLayer); previewLayer = null; }
+}
+
+// ── Background auto-fetch for permits that have addresses but no route ─────
+async function ensureRoutes() {
+  let changed = false;
+  for (const p of permits) {
+    if (p.routeCoords && p.routeCoords.length > 1) continue;
+    if (!p.addr1 || !p.addr2) continue;
+    const [g1, g2] = await Promise.all([geocodeAddress(p.addr1), geocodeAddress(p.addr2)]);
+    if (!g1 || !g2) continue;
+    const route = await fetchOSRMRoute(g1, g2);
+    if (route && route.length > 1) {
+      p.routeCoords = route;
+      const mid = route[Math.floor(route.length / 2)];
+      p.lat = mid[0]; p.lng = mid[1];
+    } else {
+      // Straight-line fallback
+      p.routeCoords = [[g1.lat, g1.lng], [g2.lat, g2.lng]];
+      p.lat = (g1.lat + g2.lat) / 2;
+      p.lng = (g1.lng + g2.lng) / 2;
+    }
+    changed = true;
+    // Respect Nominatim's 1 req/sec usage policy
+    await new Promise(res => setTimeout(res, 1100));
+  }
+  if (changed) { savePermits(); renderMap(); }
+}
+
+function setStatus(msg, type) {
+  document.getElementById('coord-status').innerHTML =
+    `<span class="rs ${type}">${msg}</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAP  —  Stadia Maps tiles (no referer restriction, works on GitHub Pages)
+// ─────────────────────────────────────────────────────────────────────────
+// OSM's own tile servers block requests without a Referer header, which
+// GitHub Pages does not send. Stadia Maps serves the same OSM data with
+// a permissive CORS + referer policy. No API key needed for open use.
+// ═══════════════════════════════════════════════════════════════════════════
 let map;
 function initMap() {
-  map = L.map('map').setView([37.871, -122.271], 14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
-  }).addTo(map);
-  map.on('click', function(e) {
+  map = L.map('map').setView([37.8716, -122.2727], 14);
+
+  // CartoDB Positron — free, no API key, no Referer restriction, CDN-hosted worldwide
+  L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    {
+      subdomains: 'abcd',
+      maxZoom: 20,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+        '&copy; <a href="https://carto.com/attributions">CARTO</a>'
+    }
+  ).addTo(map);
+
+  map.on('click', function (e) {
     if (!pickingCoord) return;
     document.getElementById('f-lat').value = e.latlng.lat.toFixed(6);
     document.getElementById('f-lng').value = e.latlng.lng.toFixed(6);
-    document.getElementById('coord-status').textContent = `✓ Placed at ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+    setStatus(`&#10003; Point placed at ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`, 'ok');
     pickingCoord = false;
     openAddModal();
   });
@@ -347,22 +654,44 @@ function initMap() {
 function renderMap() {
   mapLayers.forEach(l => map.removeLayer(l));
   mapLayers = [];
+
   permits.forEach(p => {
-    if (!p.lat || !p.lng) return;
     const c = getColor(p);
-    const offset = 0.0025;
-    const line = L.polyline([[p.lat, p.lng - offset],[p.lat, p.lng + offset]], {
-      color: c, weight: 7, opacity: 0.9
-    });
-    line.on('click', () => selectPermit(p.id));
-    line.addTo(map);
-    const dot = L.circleMarker([p.lat, p.lng], {
-      radius: 6, color: '#fff', weight: 2, fillColor: c, fillOpacity: 1
-    });
-    dot.on('click', () => selectPermit(p.id));
-    dot.addTo(map);
-    mapLayers.push(line, dot);
+
+    if (p.routeCoords && p.routeCoords.length > 1) {
+      // ── Real street geometry ──
+      const line = L.polyline(p.routeCoords, {
+        color: c, weight: 8, opacity: 0.92,
+        lineCap: 'round', lineJoin: 'round'
+      });
+      line.on('click', () => selectPermit(p.id));
+      line.addTo(map);
+      mapLayers.push(line);
+
+      // End-cap markers at each barricade point
+      [p.routeCoords[0], p.routeCoords[p.routeCoords.length - 1]].forEach(pt => {
+        const cap = L.circleMarker(pt, { radius: 6, color: '#fff', weight: 2, fillColor: c, fillOpacity: 1 });
+        cap.on('click', () => selectPermit(p.id));
+        cap.addTo(map);
+        mapLayers.push(cap);
+      });
+
+    } else if (p.lat && p.lng) {
+      // ── Fallback stub (no route yet) ──
+      const off = 0.0015;
+      const line = L.polyline([[p.lat, p.lng - off], [p.lat, p.lng + off]], {
+        color: c, weight: 6, opacity: 0.75, dashArray: '8 5'
+      });
+      line.on('click', () => selectPermit(p.id));
+      line.addTo(map);
+      const dot = L.circleMarker([p.lat, p.lng], { radius: 6, color: '#fff', weight: 2, fillColor: c, fillOpacity: 1 });
+      dot.on('click', () => selectPermit(p.id));
+      dot.addTo(map);
+      mapLayers.push(line, dot);
+    }
+    // permits with no location data at all are skipped
   });
+
   renderSidebar();
   renderStats();
 }
@@ -373,30 +702,46 @@ function selectPermit(id) {
   if (!p) return;
   renderSidebar();
   showInfoBox(p);
-  if (p.lat && p.lng) map.setView([p.lat, p.lng], 16);
+  if (p.routeCoords && p.routeCoords.length > 1) {
+    map.fitBounds(L.polyline(p.routeCoords).getBounds(), { padding: [50, 50] });
+  } else if (p.lat && p.lng) {
+    map.setView([p.lat, p.lng], 17);
+  }
 }
 
 function showInfoBox(p) {
   const s = statusLabel(p);
+  const hasRoute = p.routeCoords && p.routeCoords.length > 1;
   document.getElementById('ib-street').textContent = p.street;
   document.getElementById('ib-body').innerHTML = `
-    <div class="info-row"><span>Cross:</span>${p.cross || '—'}</div>
-    <div class="info-row"><span>Event date:</span>${p.eventdate || '—'}</div>
-    <div class="info-row"><span>Hours:</span>${p.hours || '—'}</div>
-    <div class="info-row"><span>Received:</span>${p.received || '—'}</div>
-    <div class="info-row"><span>Approved:</span>${p.approved || 'Pending'}</div>
-    <div class="info-row"><span>Applicant:</span>${p.applicant || '—'}</div>
-    <div class="info-row"><span>Contact:</span>${p.contact || '—'}</div>
-    <div style="margin-top:8px"><span class="badge" style="background:${s.bg};color:${s.color}">${s.text}</span></div>
-    ${p.activities ? `<p style="margin-top:8px;font-size:12px;color:#6b7280">${p.activities}</p>` : ''}
+    <div class="info-row"><span>Start addr:</span><span>${p.addr1 || '—'}</span></div>
+    <div class="info-row"><span>End addr:</span><span>${p.addr2 || '—'}</span></div>
+    <div class="info-row"><span>Event date:</span><span>${p.eventdate || '—'}</span></div>
+    <div class="info-row"><span>Hours:</span><span>${p.hours || '—'}</span></div>
+    <div class="info-row"><span>Received:</span><span>${p.received || '—'}</span></div>
+    <div class="info-row"><span>Approved:</span><span>${p.approved || 'Pending'}</span></div>
+    <div class="info-row"><span>Applicant:</span><span>${p.applicant || '—'}</span></div>
+    <div class="info-row"><span>Contact:</span><span>${p.contact || '—'}</span></div>
+    <div style="margin-top:7px">
+      <span class="badge" style="background:${s.bg};color:${s.color}">${s.text}</span>
+      ${!hasRoute ? '<span style="font-size:10px;color:#E0911A;margin-left:6px">&#9888; route loading…</span>' : ''}
+    </div>
+    ${p.activities ? `<p style="margin-top:7px;font-size:11px;color:#414042;line-height:1.4">${p.activities}</p>` : ''}
+    ${isEditor() ? `<button class="btn edit" style="font-size:11px;padding:4px 10px;margin-top:9px"
+      onclick="openEditModal(${p.id});document.getElementById('info-box').classList.remove('open')">
+      Edit this permit
+    </button>` : `<button class="btn" style="font-size:11px;padding:4px 10px;margin-top:9px;color:#8a8f96"
+      onclick="openLoginModal()">&#128274; Sign in to edit</button>`}
   `;
   document.getElementById('info-box').classList.add('open');
 }
 
-// ── SIDEBAR ───────────────────────────────────────────────────────────────
+// ── Sidebar ────────────────────────────────────────────────────────────────
 function renderSidebar(filter) {
-  const q = (filter || document.getElementById('sb-search').value || '').toLowerCase();
-  const list = permits.filter(p => !q || p.street.toLowerCase().includes(q) || (p.applicant||'').toLowerCase().includes(q));
+  const q = (filter !== undefined ? filter : document.getElementById('sb-search').value).toLowerCase();
+  const list = permits.filter(p =>
+    !q || p.street.toLowerCase().includes(q) || (p.applicant || '').toLowerCase().includes(q)
+  );
   document.getElementById('sb-count').textContent = list.length;
   document.getElementById('sb-list').innerHTML = list.map(p => `
     <div class="permit-card${p.id === selectedId ? ' selected' : ''}" onclick="selectPermit(${p.id})">
@@ -407,29 +752,57 @@ function renderSidebar(filter) {
   `).join('');
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('sb-search').addEventListener('input', e => renderSidebar(e.target.value));
-});
-
-// ── STATS ─────────────────────────────────────────────────────────────────
+// ── Stats ──────────────────────────────────────────────────────────────────
 function renderStats() {
   const total = permits.length;
   const approved = permits.filter(p => p.approved).length;
   const urgent = permits.filter(p => {
     if (!p.approved) return false;
-    const days = (new Date(p.eventdate+'T00:00:00') - new Date()) / 86400000;
-    return days > 0 && days <= 7;
+    const d = (new Date(p.eventdate + 'T00:00:00') - new Date()) / 86400000;
+    return d > 0 && d <= 7;
   }).length;
   document.getElementById('stats-bar').innerHTML = `
-    <div class="stat"><strong>${total}</strong> total applications</div>
+    <div class="stat"><strong>${total}</strong> total</div>
     <div class="stat"><strong>${approved}</strong> approved</div>
     <div class="stat"><strong>${total - approved}</strong> pending</div>
-    ${urgent ? `<div class="stat" style="color:#b91c1c"><strong>${urgent}</strong> event within 1 week ⚠️</div>` : ''}
+    ${urgent ? `<div class="stat urgent"><strong>&#9888; ${urgent}</strong> event within 1 week</div>` : ''}
   `;
 }
 
-// ── FORM / MODALS ─────────────────────────────────────────────────────────
+// ── Modals / form ──────────────────────────────────────────────────────────
 function openAddModal() {
+  if (!isEditor()) { openLoginModal(); return; }
+  window._pendingRoute = null;
+  document.getElementById('form-title').textContent = 'New Block Party Application';
+  document.getElementById('f-edit-id').value = '';
+  document.getElementById('add-modal').classList.add('open');
+  pickingCoord = false;
+}
+
+function openEditModal(id) {
+  if (!isEditor()) { openLoginModal(); return; }
+  const p = permits.find(x => x.id === id);
+  if (!p) return;
+  window._pendingRoute = p.routeCoords || null;
+  document.getElementById('form-title').textContent = 'Edit Permit Application';
+  document.getElementById('f-edit-id').value = id;
+  document.getElementById('f-received').value   = p.received || '';
+  document.getElementById('f-approved').value   = p.approved || '';
+  document.getElementById('f-street').value     = p.street || '';
+  document.getElementById('f-addr1').value      = p.addr1 || '';
+  document.getElementById('f-addr2').value      = p.addr2 || '';
+  document.getElementById('f-eventdate').value  = p.eventdate || '';
+  document.getElementById('f-hours').value      = p.hours || '';
+  document.getElementById('f-activities').value = p.activities || '';
+  document.getElementById('f-applicant').value  = p.applicant || '';
+  document.getElementById('f-contact').value    = p.contact || '';
+  document.getElementById('f-lat').value        = p.lat || '';
+  document.getElementById('f-lng').value        = p.lng || '';
+  if (p.routeCoords && p.routeCoords.length > 1) {
+    setStatus(`&#10003; Route loaded (${p.routeCoords.length} pts). Click "Draw Closure on Map" to refresh.`, 'ok');
+  } else {
+    document.getElementById('coord-status').innerHTML = '';
+  }
   document.getElementById('add-modal').classList.add('open');
   pickingCoord = false;
 }
@@ -441,110 +814,152 @@ function openViewModal() {
 
 function closeModals() {
   document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('open'));
+  clearPreview();
   pickingCoord = false;
 }
 
 function submitForm() {
-  const street = document.getElementById('f-street').value.trim();
+  const street    = document.getElementById('f-street').value.trim();
   const eventdate = document.getElementById('f-eventdate').value;
-  if (!street) { alert('Street/block name is required.'); return; }
+  if (!street)    { alert('Street / block description is required.'); return; }
   if (!eventdate) { alert('Event date is required.'); return; }
   const lat = parseFloat(document.getElementById('f-lat').value);
   const lng = parseFloat(document.getElementById('f-lng').value);
-  const p = {
-    id: Date.now(),
-    received:  document.getElementById('f-received').value,
-    approved:  document.getElementById('f-approved').value,
+  const editId = document.getElementById('f-edit-id').value;
+  const data = {
+    received:    document.getElementById('f-received').value,
+    approved:    document.getElementById('f-approved').value,
     street,
-    cross:     document.getElementById('f-cross').value,
+    addr1:       document.getElementById('f-addr1').value.trim(),
+    addr2:       document.getElementById('f-addr2').value.trim(),
     eventdate,
-    hours:     document.getElementById('f-hours').value,
-    activities:document.getElementById('f-activities').value,
-    applicant: document.getElementById('f-applicant').value,
-    contact:   document.getElementById('f-contact').value,
-    lat: isNaN(lat) ? null : lat,
-    lng: isNaN(lng) ? null : lng,
+    hours:       document.getElementById('f-hours').value,
+    activities:  document.getElementById('f-activities').value,
+    applicant:   document.getElementById('f-applicant').value,
+    contact:     document.getElementById('f-contact').value,
+    lat:         isNaN(lat) ? null : lat,
+    lng:         isNaN(lng) ? null : lng,
+    routeCoords: window._pendingRoute || null
   };
-  permits.push(p);
-  saveLocalExtras();
+  if (editId) {
+    const idx = permits.findIndex(p => p.id === parseInt(editId));
+    if (idx !== -1) permits[idx] = { ...permits[idx], ...data };
+  } else {
+    data.id = Date.now();
+    permits.push(data);
+  }
+  window._pendingRoute = null;
+  savePermits();
   renderMap();
   closeModals();
   clearForm();
 }
 
 function clearForm() {
-  ['f-received','f-approved','f-street','f-cross','f-eventdate','f-hours','f-activities','f-applicant','f-contact','f-lat','f-lng'].forEach(id => {
-    document.getElementById(id).value = '';
+  ['f-received','f-approved','f-street','f-addr1','f-addr2','f-eventdate',
+   'f-hours','f-activities','f-applicant','f-contact','f-lat','f-lng','f-edit-id'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
   });
-  document.getElementById('coord-status').textContent = '';
+  document.getElementById('coord-status').innerHTML = '';
+  window._pendingRoute = null;
 }
 
+// ── View table ─────────────────────────────────────────────────────────────
 function renderViewTable() {
-  const sorted = [...permits].sort((a,b) => (a.eventdate||'').localeCompare(b.eventdate||''));
+  const sorted = [...permits].sort((a, b) => (a.eventdate || '').localeCompare(b.eventdate || ''));
   document.getElementById('ptbody').innerHTML = sorted.map(p => {
     const s = statusLabel(p);
+    const hasRoute = p.routeCoords && p.routeCoords.length > 1;
     return `<tr>
-      <td><strong>${p.street}</strong><br><span style="font-size:11px;color:#9ca3af">${p.cross||''}</span></td>
-      <td>${p.eventdate||'—'}</td>
-      <td>${p.hours||'—'}</td>
+      <td>
+        <strong>${p.street}</strong>
+        ${p.addr1 ? `<br><span style="font-size:10px;color:#8a8f96">From: ${p.addr1}</span>` : ''}
+        ${p.addr2 ? `<br><span style="font-size:10px;color:#8a8f96">To: ${p.addr2}</span>` : ''}
+        ${!hasRoute ? `<br><span style="font-size:10px;color:#E0911A">&#9888; route loading</span>` : ''}
+      </td>
+      <td>${p.eventdate || '—'}</td>
+      <td style="white-space:nowrap">${p.hours || '—'}</td>
       <td><span class="badge" style="background:${s.bg};color:${s.color}">${s.text}</span></td>
-      <td>${p.received||'—'}</td>
-      <td>${p.approved||'Pending'}</td>
-      <td>${p.applicant||'—'}<br><span style="font-size:11px;color:#9ca3af">${p.contact||''}</span></td>
-      <td style="max-width:180px;font-size:12px;color:#6b7280">${p.activities||'—'}</td>
-      <td><button class="btn danger" style="font-size:11px;padding:4px 8px" onclick="deletePermit(${p.id})">Delete</button></td>
+      <td>${p.received || '—'}</td>
+      <td>${p.approved || '<em style="color:#8a8f96">Pending</em>'}</td>
+      <td>${p.applicant || '—'}<br><span style="font-size:10px;color:#8a8f96">${p.contact || ''}</span></td>
+      <td style="max-width:160px;font-size:11px;color:#414042;line-height:1.4">${p.activities || '—'}</td>
+      <td style="white-space:nowrap">
+        ${isEditor()
+          ? `<button class="btn edit" style="font-size:11px;padding:4px 8px;margin-right:4px"
+              onclick="closeModals();openEditModal(${p.id})">Edit</button>
+             <button class="btn danger" style="font-size:11px;padding:4px 8px"
+              onclick="deletePermit(${p.id})">Delete</button>`
+          : `<span style="font-size:11px;color:#8a8f96">&#128274; Read only</span>`}
+      </td>
     </tr>`;
   }).join('');
 }
 
 function deletePermit(id) {
+  if (!isEditor()) { openLoginModal(); return; }
   if (!confirm('Delete this permit application?')) return;
   permits = permits.filter(p => p.id !== id);
-  saveLocalExtras();
+  savePermits();
   renderMap();
   renderViewTable();
 }
 
-// ── COORD PICK ────────────────────────────────────────────────────────────
-// (clicking the map while add modal is open - handled via pickingCoord flag)
-// Add a "pick from map" button
-document.addEventListener('DOMContentLoaded', () => {
-  const hint = document.querySelector('.form-hint');
-  const btn = document.createElement('button');
-  btn.className = 'btn';
-  btn.id = 'pick-btn';
-  btn.textContent = '📍 Click map to place';
-  btn.onclick = function() {
-    closeModals();
-    pickingCoord = true;
-    document.getElementById('coord-status').textContent = 'Click on the map to set location...';
-  };
-  hint.parentNode.insertBefore(btn, hint);
-});
-
-// ── CSV EXPORT ────────────────────────────────────────────────────────────
+// ── CSV export ─────────────────────────────────────────────────────────────
 function exportCSV() {
-  const headers = ['Street','Cross Streets','Event Date','Hours','Received','Approved','Applicant','Contact','Activities','Lat','Lng'];
-  const rows = permits.map(p => [
-    p.street, p.cross, p.eventdate, p.hours, p.received, p.approved,
-    p.applicant, p.contact, p.activities, p.lat, p.lng
-  ].map(v => `"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
+  const headers = ['Street','Start Address','End Address','Event Date','Hours',
+                   'Received','Approved','Applicant','Contact','Activities'];
+  const rows = permits.map(p =>
+    [p.street, p.addr1, p.addr2, p.eventdate, p.hours,
+     p.received, p.approved, p.applicant, p.contact, p.activities]
+    .map(v => `"${(v || '').toString().replace(/"/g, '""')}"`).join(',')
+  );
   const csv = [headers.join(','), ...rows].join('\n');
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = `block_party_permits_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `berkeley_block_party_permits_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
 }
 
-// ── KEYBOARD ──────────────────────────────────────────────────────────────
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModals();
+// ═══════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  loadAuth();
+  renderAuthIndicator();
+
+  document.getElementById('sb-search').addEventListener('input', e => renderSidebar(e.target.value));
+
+  document.getElementById('pick-btn').addEventListener('click', () => {
+    closeModals();
+    pickingCoord = true;
+    setStatus('Click anywhere on the map to place a center point…', 'loading');
+  });
+
+  // Enter key submits login
+  document.getElementById('login-pass').addEventListener('keydown', e => {
+    if (e.key === 'Enter') attemptLogin();
+  });
+  document.getElementById('login-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('login-pass').focus();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeModals();
+      closeLoginModal();
+    }
+  });
 });
 
-// ── INIT ──────────────────────────────────────────────────────────────────
 permits = loadPermits();
 initMap();
 renderMap();
+
+// Auto-fetch routes for permits that have addresses but no route yet.
+// Runs in background after map loads. Respects Nominatim's 1 req/sec policy.
+setTimeout(() => ensureRoutes(), 1500);
 </script>
 </body>
 </html>
