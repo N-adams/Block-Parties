@@ -388,62 +388,6 @@ function attemptLogin() {
   closeLoginModal();
   renderAuthIndicator();
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// DATA
-// ─────────────────────────────────────────────────────────────────────────
-// To add permits without the UI, append to STATIC_PERMITS.
-// addr1 / addr2 = the two street addresses at each end of the closed block.
-//   Use full addresses: "401 Oak St, Berkeley, CA"
-// routeCoords = auto-populated on first load; leave null.
-// ═══════════════════════════════════════════════════════════════════════════
-const STATIC_PERMITS = [
-  {
-    id: 1,
-    received: '2026-03-01', approved: '2026-03-10',
-    street: '400 block of Oak St',
-    addr1: '401 Oak St, Berkeley, CA',
-    addr2: '499 Oak St, Berkeley, CA',
-    eventdate: '2026-03-30', hours: '12:00 PM – 6:00 PM',
-    activities: 'Live music, food vendors, bounce house',
-    applicant: 'Jane Smith', contact: 'jane@example.com',
-    lat: null, lng: null, routeCoords: null
-  },
-  {
-    id: 2,
-    received: '2026-03-05', approved: '2026-03-12',
-    street: '1700 block of McGee Ave',
-    addr1: '1700 McGee Ave, Berkeley, CA',
-    addr2: '1798 McGee Ave, Berkeley, CA',
-    eventdate: '2026-04-05', hours: '10:00 AM – 4:00 PM',
-    activities: 'Community cookout, kids games, raffle',
-    applicant: 'Robert Johnson', contact: '555-0142',
-    lat: null, lng: null, routeCoords: null
-  },
-  {
-    id: 3,
-    received: '2026-03-10', approved: '',
-    street: '2400 block of Dwight Way',
-    addr1: '2400 Dwight Way, Berkeley, CA',
-    addr2: '2498 Dwight Way, Berkeley, CA',
-    eventdate: '2026-04-18', hours: '2:00 PM – 8:00 PM',
-    activities: 'Block dance, potluck dinner',
-    applicant: 'Maria Garcia', contact: 'mgarcia@mail.com',
-    lat: null, lng: null, routeCoords: null
-  },
-  {
-    id: 4,
-    received: '2026-03-15', approved: '2026-03-20',
-    street: '800 block of Bancroft Way',
-    addr1: '800 Bancroft Way, Berkeley, CA',
-    addr2: '898 Bancroft Way, Berkeley, CA',
-    eventdate: '2026-04-10', hours: '11:00 AM – 5:00 PM',
-    activities: 'Craft fair, petting zoo, food trucks',
-    applicant: 'Tom Lee', contact: '555-0199',
-    lat: null, lng: null, routeCoords: null
-  }
-];
-
 // ── State ──────────────────────────────────────────────────────────────────
 const LS_KEY = 'berk_bp_v4';
 let permits = [];
